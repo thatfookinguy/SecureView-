@@ -3394,84 +3394,213 @@ class ScannerApp(tk.Tk):
 
         # Build HTML
         sev_css = {
-            "CRITICAL": "#ff3333", "HIGH": "#ff8800", "MEDIUM": "#ffcc00",
-            "LOW": "#44cc44", "CLEAN": "#888888", "EXCLUDED": "#5588aa",
-        }
+    "CRITICAL": "#ff3333", "HIGH": "#ff8800", "MEDIUM": "#ffcc00",
+    "LOW": "#44cc44", "CLEAN": "#888888", "EXCLUDED": "#5588aa",
+}
 
-        def row_bg(vals):
-            sev = str(vals[0]).upper()
-            c   = sev_css.get(sev, "")
-            return f'style="background:rgba({int(c[1:3],16)},{int(c[3:5],16)},{int(c[5:7],16)},0.08)"' if c else ""
+def row_bg(vals):
+    sev = str(vals[0]).upper()
+    c = sev_css.get(sev, "")
+    return (
+        f'style="background:rgba({int(c[1:3],16)},'
+        f'{int(c[3:5],16)},{int(c[5:7],16)},0.08)"'
+        if c else ""
+    )
 
-        table_html = ""
-        summary_lines = [f"Threat Report — {ts_label}", "=" * 52]
-        for title, headers, rows in sections:
-            count = len(rows)
-            crit  = sum(1 for r in rows if str(r[0]).upper() == "CRITICAL")
-            high  = sum(1 for r in rows if str(r[0]).upper() == "HIGH")
-            summary_lines.append(f"\n  {title}: {count} findings  (CRITICAL:{crit}  HIGH:{high})")
+table_html = ""
+summary_lines = [f"Threat Report — {ts_label}", "=" * 52]
 
-            th = "".join(f"<th>{h}</th>" for h in headers)
-            trs = ""
-            for row in rows:
-                tds = "".join(f"<td>{str(v)[:200]}</td>" for v in row)
-                trs += f"<tr {row_bg(row)}>{tds}</tr>\n"
-            table_html += (
-                f"<h2 id='{title}'>{title}</h2>"
-                f"<p>{count} findings &mdash; "
-                f"<span style='color:#ff3333'>CRITICAL:{crit}</span>  "
-                f"<span style='color:#ff8800'>HIGH:{high}</span></p>"
-                f"<table><thead><tr>{th}</tr></thead><tbody>{trs}</tbody></table>\n"
-            )
+for title, headers, rows in sections:
+    count = len(rows)
+    crit  = sum(1 for r in rows if str(r[0]).upper() == "CRITICAL")
+    high  = sum(1 for r in rows if str(r[0]).upper() == "HIGH")
 
-        summary_lines.append(f"\n  TOTAL: {total_rows} findings across {len(sections)} scanned areas")
+    summary_lines.append(
+        f"\n  {title}: {count} findings  (CRITICAL:{crit}  HIGH:{high})"
+    )
 
-        nav = "".join(f"<a href='#{k}'>{t}</a> &nbsp;" for t, _, r in sections for k, _ in
-                      [next(((k2, None) for k2, t2, _ in [(k3, s[0], s[2]) for k3,s in
-                       zip([x[0] for x in [("scan",""),("startup",""),("silent",""),
-                            ("tasks",""),("services",""),("extensions",""),
-                            ("hidden",""),("network",""),("processes",""),("watcher","")]], sections)
-                       if t2 == t], ("","",None))])]) if False else \
-              " &nbsp;".join(f"<a href='#{s[0]}'>{s[0].title()}</a>" for s in sections)
+    th = "".join(f"<th>{h}</th>" for h in headers)
+    trs = ""
 
-        html = f"""<!DOCTYPE html>
+    for row in rows:
+        sev = str(row[0]).upper()
+        badge = f"<span class='badge-{sev}'>{sev}</span>"
+
+        tds = "".join(
+            f"<td>{badge if i == 0 else str(v)[:200]}</td>"
+            for i, v in enumerate(row)
+        )
+
+        trs += f"<tr {row_bg(row)}>{tds}</tr>\n"
+
+    table_html += (
+        f"<h2 id='{title}'>{title}</h2>"
+        f"<a class='toplink' href='#top'>↑ Back to top</a>"
+        f"<p>{count} findings &mdash; "
+        f"<span style='color:#ff3333'>CRITICAL:{crit}</span>  "
+        f"<span style='color:#ff8800'>HIGH:{high}</span></p>"
+        f"<table><thead><tr>{th}</tr></thead><tbody>{trs}</tbody></table>\n"
+    )
+
+summary_lines.append(
+    f"\n  TOTAL: {total_rows} findings across {len(sections)} scanned areas"
+)
+
+# ✅ CLEAN NAV
+seen = set()
+links = []
+
+for title, _, _ in sections:
+    if not title:
+        continue
+    name = str(title).strip()
+    if name in seen:
+        continue
+    seen.add(name)
+    links.append(f"<a href='#{name}'>{name.title()}</a>")
+
+nav = " &nbsp;".join(links)
+
+html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Threat Report — {ts_label}</title>
+
 <style>
-  body {{ background:#0d0d1f; color:#e0e0e0; font-family:'Segoe UI',Arial,sans-serif;
-          margin:0; padding:20px; }}
-  h1   {{ color:#e94560; border-bottom:2px solid #e94560; padding-bottom:8px; }}
-  h2   {{ color:#88aaff; margin-top:32px; border-left:4px solid #0f3460;
-          padding-left:10px; }}
-  p    {{ color:#aaaaaa; font-size:0.9em; }}
-  nav  {{ background:#16213e; padding:10px 16px; border-radius:6px;
-          margin-bottom:20px; font-size:0.85em; }}
-  nav a {{ color:#88aaff; text-decoration:none; margin-right:12px; }}
-  nav a:hover {{ color:#e94560; }}
-  table {{ width:100%; border-collapse:collapse; font-size:0.82em;
-           margin-bottom:24px; }}
-  th   {{ background:#0f3460; color:#fff; padding:6px 8px; text-align:left; }}
-  td   {{ padding:5px 8px; border-bottom:1px solid #1a2a4a;
-          word-break:break-all; max-width:320px; }}
-  tr:hover td {{ background:#1a2a4a; }}
-  .badge-CRITICAL {{ color:#ff3333; font-weight:bold; }}
-  .badge-HIGH     {{ color:#ff8800; font-weight:bold; }}
-  .badge-MEDIUM   {{ color:#ffcc00; }}
-  .badge-LOW      {{ color:#44cc44; }}
-  .meta {{ color:#666688; font-size:0.8em; margin-top:40px; border-top:1px solid #333; padding-top:8px; }}
+body {{
+  background:#0d0d1f; color:#e0e0e0;
+  font-family:'Segoe UI',Arial;
+  margin:0; padding:20px;
+}}
+
+.light-mode {{
+  background:#f5f5f5;
+  color:#111;
+}}
+
+h1 {{
+  color:#e94560;
+  border-bottom:2px solid #e94560;
+}}
+
+h2 {{
+  color:#88aaff;
+  margin-top:40px;
+  border-left:4px solid #0f3460;
+  padding-left:10px;
+}}
+
+.toplink {{
+  float:right;
+  font-size:0.75em;
+  color:#888;
+  text-decoration:none;
+}}
+
+nav {{
+  position:sticky;
+  top:0;
+  background:#16213e;
+  padding:12px;
+  border-radius:6px;
+  margin-bottom:15px;
+}}
+
+nav a {{
+  color:#88aaff;
+  margin-right:12px;
+  text-decoration:none;
+}}
+
+table {{
+  width:100%;
+  border-collapse:collapse;
+}}
+
+th {{
+  background:#0f3460;
+  color:#fff;
+  padding:6px;
+}}
+
+td {{
+  padding:5px;
+  border-bottom:1px solid #1a2a4a;
+  word-break:break-all;
+}}
+
+.badge-CRITICAL {{ color:#ff3333; font-weight:bold; }}
+.badge-HIGH     {{ color:#ff8800; font-weight:bold; }}
+.badge-MEDIUM   {{ color:#ffcc00; }}
+.badge-LOW      {{ color:#44cc44; }}
 </style>
 </head>
-<body>
+
+<body id="top">
+
 <h1>🛡️ Threat Report</h1>
-<p>Generated: {ts_label} &nbsp;|&nbsp; Host: {socket.gethostname()} &nbsp;|&nbsp;
-   Total findings: <strong>{total_rows}</strong></p>
+
+<p>
+Generated: {ts_label} |
+Host: {socket.gethostname()} |
+Total findings: <b>{total_rows}</b>
+</p>
+
 <nav>{nav}</nav>
+
+<input id="searchBox" placeholder="Filter findings..."
+style="width:100%;padding:8px;margin-bottom:10px;">
+
+<canvas id="chart" height="80"></canvas>
+
+<button onclick="toggleTheme()">Toggle Theme</button>
+
 {table_html}
-<div class="meta">Generated by Silent Install &amp; Malware Scanner v6.0</div>
+
+<script>
+// 🔍 FILTER
+document.getElementById("searchBox").addEventListener("keyup", function() {{
+  let v = this.value.toLowerCase();
+  document.querySelectorAll("tbody tr").forEach(tr => {{
+    tr.style.display = tr.innerText.toLowerCase().includes(v) ? "" : "none";
+  }});
+}});
+
+// 🌗 THEME
+function toggleTheme() {{
+  document.body.classList.toggle("light-mode");
+}}
+
+// 📊 CHART
+(function() {{
+  const counts = {{CRITICAL:0,HIGH:0,MEDIUM:0,LOW:0}};
+  document.querySelectorAll("tbody tr").forEach(tr => {{
+    let t = tr.innerText.toUpperCase();
+    for (let k in counts) if (t.includes(k)) counts[k]++;
+  }});
+
+  const c = document.getElementById("chart");
+  const ctx = c.getContext("2d");
+
+  const data = Object.values(counts);
+  const colors = ["#ff3333","#ff8800","#ffcc00","#44cc44"];
+  const max = Math.max(...data,1);
+
+  let w = c.width = c.offsetWidth;
+
+  data.forEach((v,i)=>{{
+    let bw = w/data.length-10;
+    let h = (v/max)*60;
+    ctx.fillStyle = colors[i];
+    ctx.fillRect(i*(bw+10),70-h,bw,h);
+  }});
+})();
+</script>
+
 </body>
-</html>"""
+</html>
+"""
 
         # Save
         if save_as:
