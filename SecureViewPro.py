@@ -1091,10 +1091,12 @@ def scan_browser_extensions():
 # ── Widget helpers ────────────────────────────────────────────────────────────
 
 def _btn(parent, text, command, bg, fg, **kw):
-    return tk.Button(parent, text=text, command=command,
-                     bg=bg, fg=fg, activebackground=bg, activeforeground=fg,
-                     relief=tk.FLAT, padx=10, pady=4,
-                     font=("Segoe UI", 9, "bold"), cursor="hand2", **kw)
+    opts = dict(text=text, command=command,
+                bg=bg, fg=fg, activebackground=bg, activeforeground=fg,
+                relief=tk.FLAT, padx=10, pady=4,
+                font=("Segoe UI", 9, "bold"), cursor="hand2")
+    opts.update(kw)
+    return tk.Button(parent, **opts)
 
 def _tree(parent, cols, widths, heads):
     frame = tk.Frame(parent, bg=BG)
